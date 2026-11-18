@@ -8,6 +8,7 @@
 
   /* hosts candidatos, do mais novo ao mais antigo: troca de worker nao quebra link antigo */
   var HOSTS = [
+    'https://img-resizer.meadow-iguana.workers.dev',
     'https://img-resizer.bubbly-dye-c0c.workers.dev'
   ];
   var V = 'v2';
